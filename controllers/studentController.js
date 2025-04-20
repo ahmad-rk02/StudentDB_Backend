@@ -89,6 +89,26 @@ export const getAllCourses = async (req, res) => {
     res.status(500).json({ message: 'Error fetching courses: ' + error.message });
   }
 };
+export const updateCourse = async (req, res) => {
+  const { id } = req.params;
+  const { course_name, course_code, course_description } = req.body;
+
+  try {
+    const result = await pool.query(
+      'UPDATE courses SET course_name = $1, course_code = $2, course_description = $3 WHERE id = $4 RETURNING *',
+      [course_name, course_code, course_description, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('updateCourse error:', error);
+    res.status(400).json({ message: 'Error updating course: ' + error.message });
+  }
+};
 
 export const addCourse = async (req, res) => {
   const { course_name, course_code, course_description } = req.body;

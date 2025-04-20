@@ -13,7 +13,8 @@ import {
   addMarks,
   getMarks,
   updateMarks,
-  deleteMarks
+  deleteMarks,
+  updateCourse
 } from '../controllers/studentController.js';
 
 const router = express.Router();
@@ -28,6 +29,7 @@ router.delete('/students/:id', deleteStudent);
 router.get('/courses', getAllCourses);
 router.post('/courses', addCourse);
 router.delete('/courses/:id', deleteCourse);
+router.put('/courses/:id', updateCourse);
 
 // Enrollments
 router.get('/enrollments', getEnrollments);
