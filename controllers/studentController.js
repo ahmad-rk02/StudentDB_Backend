@@ -5,10 +5,10 @@ import moment from 'moment';
 export const getAllStudents = async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM students');
-    // Format dob to DD-MM-YYYY for all students
+    // Format dob to DD-MM-YYYY for each student
     const formattedRows = result.rows.map(row => ({
       ...row,
-      dob: moment(row.dob).format('DD-MM-YYYY'),
+      dob: moment(row.dob).format('DD-MM-YYYY')
     }));
     res.json(formattedRows);
   } catch (error) {
@@ -20,20 +20,15 @@ export const getAllStudents = async (req, res) => {
 export const addStudent = async (req, res) => {
   const { first_name, last_name, dob, gender, email, phone, address } = req.body;
   try {
-    // Validate and parse dob from DD-MM-YYYY to YYYY-MM-DD
-    if (!moment(dob, 'DD-MM-YYYY', true).isValid()) {
-      return res.status(400).json({ message: 'Invalid date of birth format. Use DD-MM-YYYY' });
-    }
+    // Parse dob from DD-MM-YYYY to YYYY-MM-DD
     const parsedDob = moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
-    
     const result = await pool.query(
       'INSERT INTO students (first_name, last_name, dob, gender, email, phone, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [first_name, last_name, parsedDob, gender, email, phone, address]
     );
     // Format dob back to DD-MM-YYYY for response
-    const student = result.rows[0];
-    student.dob = moment(student.dob).format('DD-MM-YYYY');
-    res.json(student);
+    result.rows[0].dob = moment(result.rows[0].dob).format('DD-MM-YYYY');
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('addStudent error:', error);
     res.status(400).json({ message: 'Error adding student: ' + error.message });
@@ -44,12 +39,8 @@ export const updateStudent = async (req, res) => {
   const { id } = req.params;
   const { first_name, last_name, dob, gender, email, phone, address } = req.body;
   try {
-    // Validate and parse dob from DD-MM-YYYY to YYYY-MM-DD
-    if (!moment(dob, 'DD-MM-YYYY', true).isValid()) {
-      return res.status(400).json({ message: 'Invalid date of birth format. Use DD-MM-YYYY' });
-    }
+    // Parse dob from DD-MM-YYYY to YYYY-MM-DD
     const parsedDob = moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
-    
     const result = await pool.query(
       'UPDATE students SET first_name=$1, last_name=$2, dob=$3, gender=$4, email=$5, phone=$6, address=$7 WHERE id=$8 RETURNING *',
       [first_name, last_name, parsedDob, gender, email, phone, address, id]
@@ -58,9 +49,8 @@ export const updateStudent = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
     // Format dob back to DD-MM-YYYY for response
-    const student = result.rows[0];
-    student.dob = moment(student.dob).format('DD-MM-YYYY');
-    res.json(student);
+    result.rows[0].dob = moment(result.rows[0].dob).format('DD-MM-YYYY');
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('updateStudent error:', error);
     res.status(400).json({ message: 'Error updating student: ' + error.message });
