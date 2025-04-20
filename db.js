@@ -8,6 +8,10 @@ const pool = new pg.Pool({
   database: process.env.DB_NAME,
   host: process.env.DB_HOST,
   port: 5432,
+  ssl: {
+    require: true,
+    rejectUnauthorized: false, // Set to false to avoid self-signed certificate issues
+  },
 });
 
 export default pool;
