@@ -20,19 +20,15 @@ export const getAllStudents = async (req, res) => {
 export const addStudent = async (req, res) => {
   const { first_name, last_name, dob, gender, email, phone, address } = req.body;
   try {
-    // Validate and parse dob from DD-MM-YYYY to YYYY-MM-DD
-    if (!moment(dob, 'DD-MM-YYYY', true).isValid()) {
-      return res.status(400).json({ message: 'Invalid date of birth format. Use DD-MM-YYYY' });
-    }
+    // Parse dob from DD-MM-YYYY to YYYY-MM-DD
     const parsedDob = moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
     const result = await pool.query(
       'INSERT INTO students (first_name, last_name, dob, gender, email, phone, address) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [first_name, last_name, parsedDob, gender, email, phone, address]
     );
     // Format dob back to DD-MM-YYYY for response
-    const student = result.rows[0];
-    student.dob = moment(student.dob).format('DD-MM-YYYY');
-    res.json(student);
+    result.rows[0].dob = moment(result.rows[0].dob).format('DD-MM-YYYY');
+    res.json(result.rows[0]);
   } catch (error) {
     console.error('addStudent error:', error);
     res.status(400).json({ message: 'Error adding student: ' + error.message });
@@ -42,28 +38,32 @@ export const addStudent = async (req, res) => {
 export const updateStudent = async (req, res) => {
   const { id } = req.params;
   const { first_name, last_name, dob, gender, email, phone, address } = req.body;
+
   try {
-    // Validate and parse dob from DD-MM-YYYY to YYYY-MM-DD
-    if (!moment(dob, 'DD-MM-YYYY', true).isValid()) {
-      return res.status(400).json({ message: 'Invalid date of birth format. Use DD-MM-YYYY' });
-    }
-    const parsedDob = moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
+    // Try to detect format automatically
+    const parsedDob = moment(dob, moment.ISO_8601, true).isValid()
+      ? dob
+      : moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
+
     const result = await pool.query(
       'UPDATE students SET first_name=$1, last_name=$2, dob=$3, gender=$4, email=$5, phone=$6, address=$7 WHERE id=$8 RETURNING *',
       [first_name, last_name, parsedDob, gender, email, phone, address, id]
     );
+
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Student not found' });
     }
+
     // Format dob back to DD-MM-YYYY
-    const student = result.rows[0];
-    student.dob = moment(student.dob).format('DD-MM-YYYY');
-    res.json(student);
+    result.rows[0].dob = moment(result.rows[0].dob).format('DD-MM-YYYY');
+    res.json(result.rows[0]);
+
   } catch (error) {
     console.error('updateStudent error:', error);
     res.status(400).json({ message: 'Error updating student: ' + error.message });
   }
 };
+
 
 export const deleteStudent = async (req, res) => {
   const { id } = req.params;
@@ -89,18 +89,20 @@ export const getAllCourses = async (req, res) => {
     res.status(500).json({ message: 'Error fetching courses: ' + error.message });
   }
 };
-
 export const updateCourse = async (req, res) => {
   const { id } = req.params;
   const { course_name, course_code, course_description } = req.body;
+
   try {
     const result = await pool.query(
       'UPDATE courses SET course_name = $1, course_code = $2, course_description = $3 WHERE id = $4 RETURNING *',
       [course_name, course_code, course_description, id]
     );
+
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Course not found' });
     }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('updateCourse error:', error);
@@ -149,11 +151,12 @@ export const enrollStudent = async (req, res) => {
     if (courseCheck.rowCount === 0) {
       return res.status(400).json({ message: 'Invalid course_id' });
     }
-    // Insert enrollment and fetch details with a CTE
+    
+    // Use CURRENT_DATE instead of relying on default timestamp
     const result = await pool.query(`
       WITH inserted AS (
         INSERT INTO enrollments (student_id, course_id, enrollment_date)
-        VALUES ($1, $2, CURRENT_TIMESTAMP)
+        VALUES ($1, $2, CURRENT_DATE)
         RETURNING id, student_id, course_id, enrollment_date
       )
       SELECT i.id, i.student_id, i.course_id, i.enrollment_date,
@@ -162,13 +165,9 @@ export const enrollStudent = async (req, res) => {
       JOIN students s ON i.student_id = s.id
       JOIN courses c ON i.course_id = c.id
     `, [student_id, course_id]);
-    // Format enrollment_date to DD-MM-YYYY
+    
     const enrollment = result.rows[0];
-    if (!moment(enrollment.enrollment_date).isValid()) {
-      throw new Error('Invalid enrollment_date returned from database');
-    }
     enrollment.enrollment_date = moment(enrollment.enrollment_date).format('DD-MM-YYYY');
-    console.log('enrollStudent response:', enrollment);
     res.json(enrollment);
   } catch (error) {
     console.error('enrollStudent error:', error);
@@ -184,17 +183,11 @@ export const getEnrollments = async (req, res) => {
       JOIN students s ON e.student_id = s.id
       JOIN courses c ON e.course_id = c.id
     `);
-    // Format enrollment_date to DD-MM-YYYY and validate
-    const formattedRows = result.rows.map(row => {
-      if (!moment(row.enrollment_date).isValid()) {
-        console.error('Invalid enrollment_date for enrollment ID:', row.id);
-        return { ...row, enrollment_date: 'Invalid Date' };
-      }
-      return {
-        ...row,
-        enrollment_date: moment(row.enrollment_date).format('DD-MM-YYYY')
-      };
-    });
+    // Format enrollment_date to DD-MM-YYYY
+    const formattedRows = result.rows.map(row => ({
+      ...row,
+      enrollment_date: moment(row.enrollment_date).format('DD-MM-YYYY')
+    }));
     console.log('getEnrollments response:', formattedRows);
     res.json(formattedRows);
   } catch (error) {
