@@ -38,24 +38,32 @@ export const addStudent = async (req, res) => {
 export const updateStudent = async (req, res) => {
   const { id } = req.params;
   const { first_name, last_name, dob, gender, email, phone, address } = req.body;
+
   try {
-    // Parse dob from DD-MM-YYYY to YYYY-MM-DD
-    const parsedDob = moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
+    // Try to detect format automatically
+    const parsedDob = moment(dob, moment.ISO_8601, true).isValid()
+      ? dob
+      : moment(dob, 'DD-MM-YYYY').format('YYYY-MM-DD');
+
     const result = await pool.query(
       'UPDATE students SET first_name=$1, last_name=$2, dob=$3, gender=$4, email=$5, phone=$6, address=$7 WHERE id=$8 RETURNING *',
       [first_name, last_name, parsedDob, gender, email, phone, address, id]
     );
+
     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Student not found' });
     }
-    // Format dob back to DD-MM-YYYY for response
+
+    // Format dob back to DD-MM-YYYY
     result.rows[0].dob = moment(result.rows[0].dob).format('DD-MM-YYYY');
     res.json(result.rows[0]);
+
   } catch (error) {
     console.error('updateStudent error:', error);
     res.status(400).json({ message: 'Error updating student: ' + error.message });
   }
 };
+
 
 export const deleteStudent = async (req, res) => {
   const { id } = req.params;
