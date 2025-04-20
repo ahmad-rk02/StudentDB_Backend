@@ -147,11 +147,11 @@ router.post('/forgot-password', async (req, res) => {
 
     console.log('Generated OTP for forgot password:', otp, 'Hashed OTP:', hashedOtp);
 
-    await pool.query('INSERT INTO user_otps (user_id, otp, expires_at) VALUES ($1, $2, $3)', [
-      user.id,
-      hashedOtp,
-      expiresAt,
-    ]);
+    // Include both user_id AND email in the insert
+    await pool.query(
+      'INSERT INTO user_otps (user_id, email, otp, expires_at) VALUES ($1, $2, $3, $4)',
+      [user.id, email, hashedOtp, expiresAt]
+    );
 
     await sendOTPEmail(email, otp);
 
