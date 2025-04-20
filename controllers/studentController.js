@@ -142,21 +142,25 @@ export const deleteCourse = async (req, res) => {
 export const enrollStudent = async (req, res) => {
   const { student_id, course_id } = req.body;
   try {
-    // Validate student_id and course_id
-    const studentCheck = await pool.query('SELECT id FROM students WHERE id = $1', [student_id]);
-    const courseCheck = await pool.query('SELECT id FROM courses WHERE id = $1', [course_id]);
-    if (studentCheck.rowCount === 0) {
-      return res.status(400).json({ message: 'Invalid student_id' });
+    // Validate student and course
+    const [studentCheck, courseCheck] = await Promise.all([
+      pool.query('SELECT id FROM students WHERE id = $1', [student_id]),
+      pool.query('SELECT id FROM courses WHERE id = $1', [course_id])
+    ]);
+
+    if (studentCheck.rowCount === 0 || courseCheck.rowCount === 0) {
+      return res.status(400).json({ 
+        message: studentCheck.rowCount === 0 ? 'Invalid student_id' : 'Invalid course_id'
+      });
     }
-    if (courseCheck.rowCount === 0) {
-      return res.status(400).json({ message: 'Invalid course_id' });
-    }
+
+    // Get current date in your local timezone (Asia/Kolkata for example)
+    const today = moment().tz('Asia/Kolkata').format('YYYY-MM-DD');
     
-    // Use CURRENT_DATE instead of relying on default timestamp
     const result = await pool.query(`
       WITH inserted AS (
         INSERT INTO enrollments (student_id, course_id, enrollment_date)
-        VALUES ($1, $2, CURRENT_DATE)
+        VALUES ($1, $2, $3::date)
         RETURNING id, student_id, course_id, enrollment_date
       )
       SELECT i.id, i.student_id, i.course_id, i.enrollment_date,
@@ -164,8 +168,8 @@ export const enrollStudent = async (req, res) => {
       FROM inserted i
       JOIN students s ON i.student_id = s.id
       JOIN courses c ON i.course_id = c.id
-    `, [student_id, course_id]);
-    
+    `, [student_id, course_id, today]);
+
     const enrollment = result.rows[0];
     enrollment.enrollment_date = moment(enrollment.enrollment_date).format('DD-MM-YYYY');
     res.json(enrollment);
